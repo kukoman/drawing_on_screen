@@ -16,7 +16,8 @@ function createWindow() {
     },
     frame: false, // Make it frameless to use custom toolbar dragging
     transparent: true, // Allow transparency for drawing overlay style
-    backgroundColor: '#00000000' // Fully transparent background
+    backgroundColor: '#00000000', // Fully transparent background
+    alwaysOnTop: true // Keep the window on top
   });
 
   mainWindow.loadFile('index.html');
@@ -31,6 +32,15 @@ app.whenReady().then(() => {
     const window = BrowserWindow.getFocusedWindow();
     if (window) {
       window.close();
+    }
+  });
+
+  // Handle click-through request from renderer/preload script
+  ipcMain.on('set-click-through', (event, enabled) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+      window.setIgnoreMouseEvents(enabled, { forward: true });
+      console.log(`Click-through set to: ${enabled}`); // Log for debugging
     }
   });
 

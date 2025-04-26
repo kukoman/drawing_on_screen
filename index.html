@@ -120,6 +120,7 @@
 <body>
   <div id="toolbar">
     <div class="tool-group">
+      <button id="pointer-btn" class="tool-btn" title="Cursor">↖</button>
       <button id="pencil-btn" class="tool-btn active" title="Pencil">✏️</button>
       <button id="line-btn" class="tool-btn" title="Line">—</button>
       <button id="arrow-btn" class="tool-btn" title="Arrow">→</button>
@@ -157,6 +158,7 @@
     const rectangleBtn = document.getElementById('rectangle-btn');
     const textBtn = document.getElementById('text-btn');
     const eraserBtn = document.getElementById('eraser-btn');
+    const pointerBtn = document.getElementById('pointer-btn');
     const colorPicker = document.getElementById('color-picker');
     const lineWidthInput = document.getElementById('line-width');
     const lineWidthMinus = document.getElementById('line-width-minus');
@@ -224,30 +226,58 @@
       isDragging = false;
     });
 
+    // Make toolbar clickable when hovered in pointer mode
+    toolbar.addEventListener('mouseenter', () => {
+      if (currentTool === 'pointer') {
+        window.electronAPI.setClickThrough(false); 
+      }
+    });
+
+    toolbar.addEventListener('mouseleave', () => {
+      if (currentTool === 'pointer') {
+        window.electronAPI.setClickThrough(true);
+      }
+    });
+
     // Tool selection
     function selectTool(tool) {
       currentTool = tool;
-      [pencilBtn, lineBtn, arrowBtn, rectangleBtn, textBtn, eraserBtn].forEach(btn => btn.classList.remove('active'));
+      // Deactivate all buttons
+      [pencilBtn, lineBtn, arrowBtn, rectangleBtn, textBtn, eraserBtn, pointerBtn].forEach(btn => btn.classList.remove('active'));
 
-      switch (tool) {
-        case 'pencil':
-          pencilBtn.classList.add('active');
-          break;
-        case 'line':
-          lineBtn.classList.add('active');
-          break;
-        case 'arrow':
-          arrowBtn.classList.add('active');
-          break;
-        case 'rectangle':
-          rectangleBtn.classList.add('active');
-          break;
-        case 'text':
-          textBtn.classList.add('active');
-          break;
-        case 'eraser':
-          eraserBtn.classList.add('active');
-          break;
+      // Set canvas container interactivity and window click-through
+      if (tool === 'pointer') {
+        canvasContainer.style.pointerEvents = 'none'; // Keep this for internal consistency
+        window.electronAPI.setClickThrough(true); // Enable click-through at OS level
+        pointerBtn.classList.add('active');
+      } else {
+        canvasContainer.style.pointerEvents = 'auto'; // Make canvas interactive for drawing tools
+        window.electronAPI.setClickThrough(false); // Disable click-through at OS level
+        // Activate the selected button
+        switch (tool) {
+          case 'pencil':
+            pencilBtn.classList.add('active');
+            break;
+          case 'line':
+            lineBtn.classList.add('active');
+            break;
+          case 'arrow':
+            arrowBtn.classList.add('active');
+            break;
+          case 'rectangle':
+            rectangleBtn.classList.add('active');
+            break;
+          case 'text':
+            textBtn.classList.add('active');
+            break;
+          case 'eraser':
+            eraserBtn.classList.add('active');
+            break;
+        }
+      }
+      
+      if (tool !== 'text') {
+          textInput.style.display = 'none';
       }
     }
 
@@ -257,7 +287,8 @@
     rectangleBtn.addEventListener('click', () => selectTool('rectangle'));
     textBtn.addEventListener('click', () => selectTool('text'));
     eraserBtn.addEventListener('click', () => selectTool('eraser'));
-
+    pointerBtn.addEventListener('click', () => selectTool('pointer'));
+    
     // Line width adjustment
     lineWidthMinus.addEventListener('click', () => {
       if (currentLineWidth > 1) {
@@ -581,8 +612,8 @@
     });
 
     // Initialization
-    selectTool('pencil');
     resizeCanvas(); // Call resize initially AFTER setting up tools etc.
+    selectTool('pencil'); // Set default tool *after* initial resize
   </script>
 </body>
 </html>
