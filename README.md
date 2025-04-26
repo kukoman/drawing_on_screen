@@ -19,6 +19,8 @@ A simple Electron application that allows drawing basic shapes, text, and erasin
 1.  Clone the repository (if you haven't already).
 2.  Navigate to the project directory: `cd drawing_on_screen`
 3.  Install dependencies: `npm install`
-4.  Run the application: `npm start`
+4.  Run the application: `npm run build:win` and look into the dist folder ;)
 
-*(Make sure you have Node.js and npm installed.)* 
+enjoy...
+
+*(Make sure you have Node.js and npm installed.)*
