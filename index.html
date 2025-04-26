@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Drawing Tool</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: rgba(0, 0, 0, 0);
+      font-family: Arial, sans-serif;
+      width: 100%;
+      height: 100%;
+    }
+    
+    #toolbar {
+      background-color: rgba(50, 50, 50, 0.8);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: move;
+      user-select: none;
+      position: fixed;
+      /* Add initial position - will be set by JS */
+      /* top: 20px; 
+      left: 50%; 
+      transform: translateX(-50%);  */
+      z-index: 2;
+    }
+    
+    .tool-btn {
+      width: 24px;
+      height: 24px;
+      background-color: #555;
+      border: none;
+      border-radius: 4px;
+      margin: 0 3px;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 14px;
+    }
+    
+    .tool-btn:hover {
+      background-color: #777;
+    }
+    
+    .tool-btn.close-btn { /* Style for the close button */
+      background-color: #c0392b; /* Red background */
+      color: white;
+      font-weight: bold;
+      margin-left: 10px; /* Add some space */
+    }
+    
+    .tool-btn.close-btn:hover {
+      background-color: #e74c3c; /* Lighter red on hover */
+    }
+    
+    .tool-btn.active {
+      background-color: #3a6ea5;
+    }
+    
+    #color-picker {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    
+    #line-width {
+      width: 40px;
+      text-align: center;
+      border-radius: 4px;
+      background-color: #555;
+      color: white;
+      border: none;
+    }
+    
+    .tool-group {
+      display: flex;
+      align-items: center;
+    }
+    
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+    }
+    
+    #draw-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+    }
+    
+    #text-input {
+      position: absolute;
+      background: transparent;
+      border: 1px dashed #3a6ea5;
+      color: black;
+      font-family: Arial, sans-serif;
+      display: none;
+      z-index: 1000;
+      padding: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <div class="tool-group">
+      <button id="pencil-btn" class="tool-btn active" title="Pencil">✏️</button>
+      <button id="line-btn" class="tool-btn" title="Line">—</button>
+      <button id="arrow-btn" class="tool-btn" title="Arrow">→</button>
+      <button id="rectangle-btn" class="tool-btn" title="Rectangle">▭</button>
+      <button id="text-btn" class="tool-btn" title="Text">T</button>
+      <button id="eraser-btn" class="tool-btn" title="Eraser">🧽</button>
+    </div>
+    
+    <div class="tool-group">
+      <button id="line-width-minus" class="tool-btn" title="Thinner">-</button>
+      <input type="text" id="line-width" value="3" readonly>
+      <button id="line-width-plus" class="tool-btn" title="Thicker">+</button>
+      <input type="color" id="color-picker" value="#ff0000" title="Color">
+      <button id="clear-btn" class="tool-btn" title="Clear All">🗑️</button>
+    </div>
+    
+    <button id="close-btn" class="tool-btn close-btn" title="Close">X</button>
+  </div>
+  
+  <div id="canvas-container">
+    <canvas id="draw-canvas"></canvas>
+    <textarea id="text-input"></textarea>
+  </div>
+
+  <script>
+    // Get elements and set initial state
+    const toolbar = document.getElementById('toolbar');
+    const canvas = document.getElementById('draw-canvas');
+    const ctx = canvas.getContext('2d');
+    const textInput = document.getElementById('text-input');
+    
+    const pencilBtn = document.getElementById('pencil-btn');
+    const lineBtn = document.getElementById('line-btn');
+    const arrowBtn = document.getElementById('arrow-btn');
+    const rectangleBtn = document.getElementById('rectangle-btn');
+    const textBtn = document.getElementById('text-btn');
+    const eraserBtn = document.getElementById('eraser-btn');
+    const colorPicker = document.getElementById('color-picker');
+    const lineWidthInput = document.getElementById('line-width');
+    const lineWidthMinus = document.getElementById('line-width-minus');
+    const lineWidthPlus = document.getElementById('line-width-plus');
+    const clearBtn = document.getElementById('clear-btn');
+    const closeBtn = document.getElementById('close-btn'); // Get close button
+    const canvasContainer = document.getElementById('canvas-container'); // Get canvas container
+    
+    // Drawing variables
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+    let currentTool = 'pencil';
+    let currentColor = '#ff0000';
+    let currentLineWidth = 3;
+    let startX, startY;
+    let shapes = []; // Store all shapes
+    let currentShape = null;
+
+    // Set canvas size to match window size, accounting for device pixel ratio
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect(); // Get bounds *before* setting style width/height
+
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+
+      ctx.scale(dpr, dpr);
+      
+      // Toolbar positioning needs to consider CSS pixels, not scaled pixels
+      if (!toolbar.style.left && !toolbar.style.top) {
+        // Use window.innerWidth for positioning calculations
+        toolbar.style.left = `${(window.innerWidth - toolbar.offsetWidth) / 2}px`; 
+        toolbar.style.top = '20px';
+      }
+
+      redraw(); // Redraw after resizing and scaling
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    // resizeCanvas(); // Initial call moved to the end after other initializations
+
+    // Toolbar dragging
+    let isDragging = false;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    toolbar.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      dragOffsetX = e.clientX - toolbar.getBoundingClientRect().left;
+      dragOffsetY = e.clientY - toolbar.getBoundingClientRect().top;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        toolbar.style.left = (e.clientX - dragOffsetX) + 'px';
+        toolbar.style.top = (e.clientY - dragOffsetY) + 'px';
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    // Tool selection
+    function selectTool(tool) {
+      currentTool = tool;
+      [pencilBtn, lineBtn, arrowBtn, rectangleBtn, textBtn, eraserBtn].forEach(btn => btn.classList.remove('active'));
+
+      switch (tool) {
+        case 'pencil':
+          pencilBtn.classList.add('active');
+          break;
+        case 'line':
+          lineBtn.classList.add('active');
+          break;
+        case 'arrow':
+          arrowBtn.classList.add('active');
+          break;
+        case 'rectangle':
+          rectangleBtn.classList.add('active');
+          break;
+        case 'text':
+          textBtn.classList.add('active');
+          break;
+        case 'eraser':
+          eraserBtn.classList.add('active');
+          break;
+      }
+    }
+
+    pencilBtn.addEventListener('click', () => selectTool('pencil'));
+    lineBtn.addEventListener('click', () => selectTool('line'));
+    arrowBtn.addEventListener('click', () => selectTool('arrow'));
+    rectangleBtn.addEventListener('click', () => selectTool('rectangle'));
+    textBtn.addEventListener('click', () => selectTool('text'));
+    eraserBtn.addEventListener('click', () => selectTool('eraser'));
+
+    // Line width adjustment
+    lineWidthMinus.addEventListener('click', () => {
+      if (currentLineWidth > 1) {
+        currentLineWidth--;
+        lineWidthInput.value = currentLineWidth;
+      }
+    });
+
+    lineWidthPlus.addEventListener('click', () => {
+      currentLineWidth++;
+      lineWidthInput.value = currentLineWidth;
+    });
+
+    // Color selection
+    colorPicker.addEventListener('input', (e) => {
+      currentColor = e.target.value;
+    });
+
+    // Clear canvas
+    clearBtn.addEventListener('click', () => {
+      shapes = [];
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+    // Close button functionality
+    closeBtn.addEventListener('click', () => {
+      window.electronAPI.closeApp(); // Call the function exposed by preload.js
+    });
+
+    // Draw an arrow with a sharp tip
+    function drawArrow(fromX, fromY, toX, toY, color, lineWidth) {
+      const headLength = lineWidth * 5;
+      const angle = Math.atan2(toY - fromY, toX - fromX);
+      
+      // Draw the line
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+      // Stop the line short of the tip to avoid overlap with the arrowhead
+      const lineEndX = toX - headLength * Math.cos(angle);
+      const lineEndY = toY - headLength * Math.sin(angle);
+      ctx.lineTo(lineEndX, lineEndY);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'butt';
+      ctx.stroke();
+      
+      // Draw arrowhead
+      ctx.beginPath();
+      ctx.moveTo(toX, toY);
+      ctx.lineTo(
+        lineEndX - headLength * Math.cos(angle - Math.PI / 6),
+        lineEndY - headLength * Math.sin(angle - Math.PI / 6)
+      );
+      ctx.lineTo(
+        lineEndX - headLength * Math.cos(angle + Math.PI / 6),
+        lineEndY - headLength * Math.sin(angle + Math.PI / 6)
+      );
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Redraw all shapes
+    function redraw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      shapes.forEach(shape => {
+        if (shape.type === 'pencil' || shape.type === 'eraser') {
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(shape.points[0].x, shape.points[0].y);
+          for (let i = 1; i < shape.points.length; i++) {
+            ctx.lineTo(shape.points[i].x, shape.points[i].y);
+          }
+          if (shape.type === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
+            ctx.lineWidth = shape.lineWidth * 10; // 10x the line width for eraser
+          } else {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = shape.color;
+            ctx.lineWidth = shape.lineWidth;
+          }
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+          ctx.restore();
+        } else if (shape.type === 'line') {
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(shape.startX, shape.startY);
+          ctx.lineTo(shape.endX, shape.endY);
+          ctx.strokeStyle = shape.color;
+          ctx.lineWidth = shape.lineWidth;
+          ctx.stroke();
+          ctx.restore();
+        } else if (shape.type === 'arrow') {
+          drawArrow(shape.startX, shape.startY, shape.endX, shape.endY, shape.color, shape.lineWidth);
+        } else if (shape.type === 'rectangle') {
+          ctx.save();
+          ctx.strokeStyle = shape.color;
+          ctx.lineWidth = shape.lineWidth;
+          ctx.strokeRect(shape.startX, shape.startY, shape.endX - shape.startX, shape.endY - shape.startY);
+          ctx.restore();
+        } else if (shape.type === 'text') {
+          ctx.save();
+          ctx.font = `${shape.fontSize}px Arial`;
+          ctx.fillStyle = shape.color;
+          ctx.fillText(shape.text, shape.x, shape.y);
+          ctx.restore();
+        }
+      });
+    }
+
+    // Text input
+    let textX, textY; // Store text position globally to ensure correct placement
+
+    function startTextInput(x, y) {
+      textX = x;
+      textY = y;
+      textInput.style.display = 'block';
+      textInput.style.left = x + 'px';
+      textInput.style.top = y + 'px';
+      textInput.style.color = currentColor;
+      textInput.style.fontSize = (currentLineWidth * 5) + 'px';
+      textInput.value = ''; // Clear previous text
+      textInput.focus();
+
+      // Handle text submission
+      const finishText = () => {
+        if (textInput.value.trim() !== '') {
+          shapes.push({
+            type: 'text',
+            text: textInput.value,
+            x: textX,
+            y: textY,
+            color: currentColor,
+            fontSize: currentLineWidth * 5
+          });
+          redraw();
+        }
+        textInput.style.display = 'none';
+      };
+
+      textInput.addEventListener('blur', finishText, { once: true });
+      textInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          finishText();
+        }
+      });
+    }
+
+    // Drawing events
+    let tempPoints = []; // Temporary points for pencil/eraser
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.target === canvas) {
+        e.preventDefault();
+        
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        if (currentTool === 'text') {
+          startTextInput(x, y);
+          return;
+        }
+
+        isDrawing = true;
+        lastX = x;
+        lastY = y;
+        startX = x;
+        startY = y;
+
+        if (currentTool === 'pencil' || currentTool === 'eraser') {
+          tempPoints = [{ x, y }];
+        }
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      // Redraw the canvas only if we're actively drawing
+      if (isDrawing) {
+        if (currentTool === 'pencil' || currentTool === 'eraser') {
+          tempPoints.push({ x, y });
+          // Redraw all shapes
+          redraw();
+          // Draw the entire current stroke
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(tempPoints[0].x, tempPoints[0].y);
+          for (let i = 1; i < tempPoints.length; i++) {
+            ctx.lineTo(tempPoints[i].x, tempPoints[i].y);
+          }
+          if (currentTool === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
+            ctx.lineWidth = currentLineWidth * 10; // 10x the line width for eraser
+          } else {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = currentLineWidth;
+          }
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+          ctx.restore();
+        } else if (currentTool === 'line' || currentTool === 'arrow' || currentTool === 'rectangle') {
+          redraw();
+          if (currentTool === 'line') {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(x, y);
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = currentLineWidth;
+            ctx.stroke();
+            ctx.restore();
+          } else if (currentTool === 'arrow') {
+            drawArrow(startX, startY, x, y, currentColor, currentLineWidth);
+          } else if (currentTool === 'rectangle') {
+            ctx.save();
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = currentLineWidth;
+            ctx.strokeRect(startX, startY, x - startX, y - startY);
+            ctx.restore();
+          }
+        }
+      }
+
+      // Draw eraser outline if eraser tool is selected, regardless of isDrawing
+      if (currentTool === 'eraser') {
+        if (!isDrawing) {
+          redraw(); // Ensure the canvas is up-to-date before drawing the outline
+        }
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, (currentLineWidth * 10) / 2, 0, Math.PI * 2);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]); // Dashed line
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset dash
+        ctx.restore();
+      }
+
+      lastX = x;
+      lastY = y;
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      if (!isDrawing) return;
+
+      if (currentTool === 'pencil' || currentTool === 'eraser') {
+        shapes.push({
+          type: currentTool,
+          points: tempPoints,
+          color: currentColor,
+          lineWidth: currentLineWidth
+        });
+        tempPoints = [];
+        redraw();
+      } else if (currentTool === 'line') {
+        shapes.push({
+          type: 'line',
+          startX,
+          startY,
+          endX: lastX,
+          endY: lastY,
+          color: currentColor,
+          lineWidth: currentLineWidth
+        });
+        redraw();
+      } else if (currentTool === 'arrow') {
+        shapes.push({
+          type: 'arrow',
+          startX,
+          startY,
+          endX: lastX,
+          endY: lastY,
+          color: currentColor,
+          lineWidth: currentLineWidth
+        });
+        redraw();
+      } else if (currentTool === 'rectangle') {
+        shapes.push({
+          type: 'rectangle',
+          startX,
+          startY,
+          endX: lastX,
+          endY: lastY,
+          color: currentColor,
+          lineWidth: currentLineWidth
+        });
+        redraw();
+      }
+
+      isDrawing = false;
+    });
+
+    canvas.addEventListener('mouseout', () => {
+      if (isDrawing) {
+        if (currentTool === 'pencil' || currentTool === 'eraser') {
+          shapes.push({
+            type: currentTool,
+            points: tempPoints,
+            color: currentColor,
+            lineWidth: currentLineWidth
+          });
+          tempPoints = [];
+          redraw();
+        }
+        isDrawing = false;
+      }
+    });
+
+    // Initialization
+    selectTool('pencil');
+    resizeCanvas(); // Call resize initially AFTER setting up tools etc.
+  </script>
+</body>
+</html>
