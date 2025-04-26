@@ -24,3 +24,7 @@ A simple Electron application that allows drawing basic shapes, text, and erasin
 enjoy...
 
 *(Make sure you have Node.js and npm installed.)*
+
+## Showcase
+
+![Drawing Tool Example](drawing-tool-example.png)
