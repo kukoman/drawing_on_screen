@@ -14,6 +14,10 @@ A simple Electron application that allows drawing basic shapes, text, and erasin
 *   Clear Canvas
 *   Close Application
 
+## Download
+
+*   **Windows Portable:** [Download Here](https://github.com/kukoman/drawing_on_screen/blob/master/dist/drawing-tool-portable.zip)
+
 ## Running the Application
 
 1.  Clone the repository (if you haven't already).
