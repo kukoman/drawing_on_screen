@@ -73,13 +73,21 @@
       cursor: pointer;
     }
     
-    #line-width {
-      width: 40px;
+    #line-width-select { /* Style for the new dropdown */
+      width: 45px; /* Adjust width as needed */
       text-align: center;
       border-radius: 4px;
       background-color: #555;
       color: white;
       border: none;
+      padding: 2px 0; /* Add some padding */
+      height: 24px; /* Match button height */
+      margin: 0 3px; /* Add some spacing */
+      cursor: pointer;
+    }
+    
+    #line-width-select:hover {
+      background-color: #777;
     }
     
     .tool-group {
@@ -130,9 +138,15 @@
     </div>
     
     <div class="tool-group">
-      <button id="line-width-minus" class="tool-btn" title="Thinner">-</button>
-      <input type="text" id="line-width" value="3" readonly>
-      <button id="line-width-plus" class="tool-btn" title="Thicker">+</button>
+      <select id="line-width-select" title="Line Width">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3" selected>3</option>
+        <option value="5">5</option>
+        <option value="8">8</option>
+        <option value="13">13</option>
+        <option value="20">20</option>
+      </select>
       <input type="color" id="color-picker" value="#ff0000" title="Color">
       <button id="clear-btn" class="tool-btn" title="Clear All">🗑️</button>
     </div>
@@ -160,9 +174,7 @@
     const eraserBtn = document.getElementById('eraser-btn');
     const pointerBtn = document.getElementById('pointer-btn');
     const colorPicker = document.getElementById('color-picker');
-    const lineWidthInput = document.getElementById('line-width');
-    const lineWidthMinus = document.getElementById('line-width-minus');
-    const lineWidthPlus = document.getElementById('line-width-plus');
+    const lineWidthSelect = document.getElementById('line-width-select');
     const clearBtn = document.getElementById('clear-btn');
     const closeBtn = document.getElementById('close-btn'); // Get close button
     const canvasContainer = document.getElementById('canvas-container'); // Get canvas container
@@ -173,7 +185,7 @@
     let lastY = 0;
     let currentTool = 'pencil';
     let currentColor = '#ff0000';
-    let currentLineWidth = 3;
+    let currentLineWidth = parseInt(lineWidthSelect.value, 10);
     let startX, startY;
     let shapes = []; // Store all shapes
     let currentShape = null;
@@ -289,17 +301,8 @@
     eraserBtn.addEventListener('click', () => selectTool('eraser'));
     pointerBtn.addEventListener('click', () => selectTool('pointer'));
     
-    // Line width adjustment
-    lineWidthMinus.addEventListener('click', () => {
-      if (currentLineWidth > 1) {
-        currentLineWidth--;
-        lineWidthInput.value = currentLineWidth;
-      }
-    });
-
-    lineWidthPlus.addEventListener('click', () => {
-      currentLineWidth++;
-      lineWidthInput.value = currentLineWidth;
+    lineWidthSelect.addEventListener('change', (e) => {
+        currentLineWidth = parseInt(e.target.value, 10);
     });
 
     // Color selection
@@ -367,11 +370,11 @@
           if (shape.type === 'eraser') {
             ctx.globalCompositeOperation = 'destination-out';
             ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
-            ctx.lineWidth = shape.lineWidth * 10; // 10x the line width for eraser
+            ctx.lineWidth = currentLineWidth * 10;
           } else {
             ctx.globalCompositeOperation = 'source-over';
             ctx.strokeStyle = shape.color;
-            ctx.lineWidth = shape.lineWidth;
+            ctx.lineWidth = currentLineWidth;
           }
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
@@ -492,7 +495,7 @@
           if (currentTool === 'eraser') {
             ctx.globalCompositeOperation = 'destination-out';
             ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
-            ctx.lineWidth = currentLineWidth * 10; // 10x the line width for eraser
+            ctx.lineWidth = currentLineWidth * 10;
           } else {
             ctx.globalCompositeOperation = 'source-over';
             ctx.strokeStyle = currentColor;
