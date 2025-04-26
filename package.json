@@ -23,8 +23,15 @@
       "output": "dist"
     },
     "win": {
-      "target": "portable",
-      "icon": "icon.png"
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
     },
     "mac": {
       "target": "zip",
