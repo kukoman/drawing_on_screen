@@ -121,7 +121,6 @@
       font-family: Arial, sans-serif;
       display: none;
       z-index: 1000;
-      padding: 2px;
     }
   </style>
 </head>
@@ -293,13 +292,13 @@
       }
     }
 
-    pencilBtn.addEventListener('click', () => selectTool('pencil'));
-    lineBtn.addEventListener('click', () => selectTool('line'));
-    arrowBtn.addEventListener('click', () => selectTool('arrow'));
-    rectangleBtn.addEventListener('click', () => selectTool('rectangle'));
-    textBtn.addEventListener('click', () => selectTool('text'));
-    eraserBtn.addEventListener('click', () => selectTool('eraser'));
-    pointerBtn.addEventListener('click', () => selectTool('pointer'));
+    pencilBtn.addEventListener('click', () => currentTool === 'pencil' ? selectTool('pointer') : selectTool('pencil'));
+    lineBtn.addEventListener('click', () => currentTool === 'line' ? selectTool('pointer') : selectTool('line'));
+    arrowBtn.addEventListener('click', () => currentTool === 'arrow' ? selectTool('pointer') : selectTool('arrow'));
+    rectangleBtn.addEventListener('click', () => currentTool === 'rectangle' ? selectTool('pointer') : selectTool('rectangle'));
+    textBtn.addEventListener('click', () => currentTool === 'text' ? selectTool('pointer') : selectTool('text'));
+    eraserBtn.addEventListener('click', () => currentTool === 'eraser' ? selectTool('pointer') : selectTool('eraser'));
+    pointerBtn.addEventListener('click', () => selectTool('pointer')); // Pointer button doesn't toggle
     
     lineWidthSelect.addEventListener('change', (e) => {
         currentLineWidth = parseInt(e.target.value, 10);
@@ -399,6 +398,7 @@
           ctx.restore();
         } else if (shape.type === 'text') {
           ctx.save();
+          ctx.textBaseline = 'top';
           ctx.font = `${shape.fontSize}px Arial`;
           ctx.fillStyle = shape.color;
           ctx.fillText(shape.text, shape.x, shape.y);

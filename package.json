@@ -1,6 +1,6 @@
 {
   "name": "drawing-tool",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A simple drawing tool",
   "main": "main.js",
   "scripts": {
@@ -31,6 +31,7 @@
           ]
         }
       ],
+      "artifactName": "${productName}-v${version}.${ext}",
       "icon": "build/icon.ico"
     },
     "mac": {
