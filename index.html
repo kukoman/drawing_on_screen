@@ -370,11 +370,11 @@
           if (shape.type === 'eraser') {
             ctx.globalCompositeOperation = 'destination-out';
             ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
-            ctx.lineWidth = currentLineWidth * 10;
+            ctx.lineWidth = shape.lineWidth * 10;
           } else {
             ctx.globalCompositeOperation = 'source-over';
             ctx.strokeStyle = shape.color;
-            ctx.lineWidth = currentLineWidth;
+            ctx.lineWidth = shape.lineWidth;
           }
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
