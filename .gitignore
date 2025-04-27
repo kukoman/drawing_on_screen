@@ -92,4 +92,7 @@ Thumbs.db
 *.dmg
 *.deb
 *.rpm
-*.pkg 
+*.pkg
+
+# Cursor IDE specific files
+.cursor/ 
