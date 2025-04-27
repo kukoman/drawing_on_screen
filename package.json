@@ -1,12 +1,12 @@
 {
   "name": "drawing-tool",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A simple drawing tool",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win && tar -a -c -f dist/drawing-tool-portable.zip -C dist/win-unpacked .",
+    "build:win": "electron-builder --win && tar -a -c -f dist/drawing-tool-portable-v%npm_package_version%.zip -C dist/win-unpacked .",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux"
   },

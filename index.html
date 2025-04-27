@@ -451,17 +451,26 @@
 
     canvas.addEventListener('mousedown', (e) => {
       if (e.target === canvas) {
-        e.preventDefault();
-        
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
         if (currentTool === 'text') {
-          startTextInput(x, y);
-          return;
+          e.preventDefault(); // Prevent default text selection/drag behavior
+
+          if (textInput.style.display === 'block') {
+            // Input is visible: finalize the old one via blur, then start a new one
+            textInput.blur(); // Force blur to trigger finishText
+            startTextInput(x, y); // Start new input at click location
+          } else {
+            // Input is not visible: just start a new one
+            startTextInput(x, y);
+          }
+          return; // Don't proceed to drawing logic for text tool
         }
 
+        // --- Start drawing logic for non-text tools --- 
+        e.preventDefault(); // Prevent default for drawing actions
         isDrawing = true;
         lastX = x;
         lastY = y;
@@ -616,7 +625,7 @@
 
     // Initialization
     resizeCanvas(); // Call resize initially AFTER setting up tools etc.
-    selectTool('pencil'); // Set default tool *after* initial resize
+    selectTool('pointer'); // Set default tool *after* initial resize
   </script>
 </body>
 </html>
