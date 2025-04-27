@@ -147,6 +147,8 @@
         <option value="20">20</option>
       </select>
       <input type="color" id="color-picker" value="#ff0000" title="Color">
+      <button id="undo-btn" class="tool-btn" title="Undo">↩️</button>
+      <button id="redo-btn" class="tool-btn" title="Redo">↪️</button>
       <button id="clear-btn" class="tool-btn" title="Clear All">🗑️</button>
     </div>
     
@@ -176,6 +178,8 @@
     const lineWidthSelect = document.getElementById('line-width-select');
     const clearBtn = document.getElementById('clear-btn');
     const closeBtn = document.getElementById('close-btn'); // Get close button
+    const undoBtn = document.getElementById('undo-btn'); // Get undo button
+    const redoBtn = document.getElementById('redo-btn'); // Get redo button
     const canvasContainer = document.getElementById('canvas-container'); // Get canvas container
     
     // Drawing variables
@@ -186,7 +190,8 @@
     let currentColor = '#ff0000';
     let currentLineWidth = parseInt(lineWidthSelect.value, 10);
     let startX, startY;
-    let shapes = []; // Store all shapes
+    let history = [];
+    let redoHistory = [];
     let currentShape = null;
 
     // Set canvas size to match window size, accounting for device pixel ratio
@@ -309,10 +314,11 @@
       currentColor = e.target.value;
     });
 
-    // Clear canvas
+    // Clear canvas - Modified to handle history
     clearBtn.addEventListener('click', () => {
-      shapes = [];
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      history = [];
+      redoHistory = []; // Clear redo history as well
+      redraw(); // Redraw the empty canvas
     });
 
     // Close button functionality
@@ -355,10 +361,10 @@
       ctx.restore();
     }
 
-    // Redraw all shapes
+    // Redraw all shapes - Modified to use history array
     function redraw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      shapes.forEach(shape => {
+      history.forEach(shape => { // Iterate over history instead of shapes
         if (shape.type === 'pencil' || shape.type === 'eraser') {
           ctx.save();
           ctx.beginPath();
@@ -410,6 +416,43 @@
     // Text input
     let textX, textY; // Store text position globally to ensure correct placement
 
+    // Define text handling functions globally within the script scope
+    const finishText = () => {
+      // Remove the keydown listener when finishing text
+      textInput.removeEventListener('keydown', handleTextKeyDown);
+      
+      const textValue = textInput.value.trim(); 
+      textInput.style.display = 'none'; 
+      
+      if (textValue !== '') {
+        const action = { 
+          type: 'text',
+          text: textValue, 
+          x: textX,
+          y: textY,
+          color: currentColor,
+          fontSize: currentLineWidth * 5
+        };
+        recordAction(action); 
+        redraw(); 
+      } 
+    };
+
+    const handleTextKeyDown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        // Manually remove blur listener here, as finishText might not be called if input is empty
+        textInput.removeEventListener('blur', finishText); 
+        finishText(); 
+      } else if (e.key === 'Escape') {
+        e.preventDefault(); 
+        textInput.style.display = 'none';
+        // Explicitly remove both listeners on Escape
+        textInput.removeEventListener('blur', finishText);
+        textInput.removeEventListener('keydown', handleTextKeyDown);
+      }
+    };
+
     function startTextInput(x, y) {
       textX = x;
       textY = y;
@@ -421,29 +464,13 @@
       textInput.value = ''; // Clear previous text
       textInput.focus();
 
-      // Handle text submission
-      const finishText = () => {
-        if (textInput.value.trim() !== '') {
-          shapes.push({
-            type: 'text',
-            text: textInput.value,
-            x: textX,
-            y: textY,
-            color: currentColor,
-            fontSize: currentLineWidth * 5
-          });
-          redraw();
-        }
-        textInput.style.display = 'none';
-      };
+      // Remove any existing listeners first to prevent duplicates
+      textInput.removeEventListener('blur', finishText);
+      textInput.removeEventListener('keydown', handleTextKeyDown);
 
+      // Add the listeners
       textInput.addEventListener('blur', finishText, { once: true });
-      textInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          finishText();
-        }
-      });
+      textInput.addEventListener('keydown', handleTextKeyDown);
     }
 
     // Drawing events
@@ -459,9 +486,12 @@
           e.preventDefault(); // Prevent default text selection/drag behavior
 
           if (textInput.style.display === 'block') {
-            // Input is visible: finalize the old one via blur, then start a new one
-            textInput.blur(); // Force blur to trigger finishText
-            startTextInput(x, y); // Start new input at click location
+            // Input is visible: finalize the old one first, then start a new one
+            textInput.blur(); // Force blur to trigger finishText - RESTORED
+            // Check if the input is still displayed after blur (might be hidden by finishText)
+            // Only start new input if the click wasn't just to finalize
+            // This check might be tricky due to event timing, let's start simple:
+             startTextInput(x, y); // Start new input at click location
           } else {
             // Input is not visible: just start a new one
             startTextInput(x, y);
@@ -559,18 +589,19 @@
 
     canvas.addEventListener('mouseup', () => {
       if (!isDrawing) return;
+      isDrawing = false; // Set isDrawing to false first
 
+      let action = null;
       if (currentTool === 'pencil' || currentTool === 'eraser') {
-        shapes.push({
+        action = {
           type: currentTool,
           points: tempPoints,
-          color: currentColor,
+          color: currentColor, // Eraser color doesn't matter, but store consistently
           lineWidth: currentLineWidth
-        });
-        tempPoints = [];
-        redraw();
+        };
+        tempPoints = []; // Clear temp points AFTER potentially creating the action
       } else if (currentTool === 'line') {
-        shapes.push({
+        action = {
           type: 'line',
           startX,
           startY,
@@ -578,10 +609,9 @@
           endY: lastY,
           color: currentColor,
           lineWidth: currentLineWidth
-        });
-        redraw();
+        };
       } else if (currentTool === 'arrow') {
-        shapes.push({
+        action = {
           type: 'arrow',
           startX,
           startY,
@@ -589,43 +619,109 @@
           endY: lastY,
           color: currentColor,
           lineWidth: currentLineWidth
-        });
-        redraw();
+        };
       } else if (currentTool === 'rectangle') {
-        shapes.push({
-          type: 'rectangle',
-          startX,
-          startY,
-          endX: lastX,
-          endY: lastY,
-          color: currentColor,
-          lineWidth: currentLineWidth
-        });
-        redraw();
+        // Ensure width and height are positive for consistent drawing
+        const x1 = Math.min(startX, lastX);
+        const y1 = Math.min(startY, lastY);
+        const x2 = Math.max(startX, lastX);
+        const y2 = Math.max(startY, lastY);
+        action = {
+            type: 'rectangle',
+            startX: x1,
+            startY: y1,
+            endX: x2, // Store the calculated corners
+            endY: y2,
+            color: currentColor,
+            lineWidth: currentLineWidth
+        };
       }
 
-      isDrawing = false;
+      if (action) {
+          recordAction(action);
+      }
+      redraw(); // Redraw the final state from history
     });
 
     canvas.addEventListener('mouseout', () => {
-      if (isDrawing) {
-        if (currentTool === 'pencil' || currentTool === 'eraser') {
-          shapes.push({
-            type: currentTool,
-            points: tempPoints,
-            color: currentColor,
-            lineWidth: currentLineWidth
-          });
-          tempPoints = [];
+      // Only finalize pencil/eraser strokes if drawing was in progress
+      if (isDrawing && (currentTool === 'pencil' || currentTool === 'eraser')) {
+          const action = {
+              type: currentTool,
+              points: tempPoints,
+              color: currentColor, // Eraser color doesn't matter
+              lineWidth: currentLineWidth
+          };
+          recordAction(action);
+          tempPoints = []; // Clear temp points
+          isDrawing = false; // Ensure drawing stops
+          redraw(); // Redraw the final state
+      } else if (isDrawing) {
+         // For other tools like line/rect/arrow, treat mouseout like mouseup
+         canvas.dispatchEvent(new MouseEvent('mouseup'));
+      } else {
+          // If not drawing, just redraw to remove any temporary previews (like eraser outline)
           redraw();
+      }
+    });
+
+    // --- History Management ---
+    function recordAction(action) {
+        history.push(action);
+        redoHistory = []; // Clear redo history whenever a new action is performed
+        updateUndoRedoButtons();
+    }
+
+    function undo() {
+        if (history.length > 0) {
+            const lastAction = history.pop();
+            redoHistory.push(lastAction);
+            redraw();
+            updateUndoRedoButtons();
         }
-        isDrawing = false;
+    }
+
+    function redo() {
+        if (redoHistory.length > 0) {
+            const actionToRedo = redoHistory.pop();
+            history.push(actionToRedo);
+            redraw();
+            updateUndoRedoButtons();
+        }
+    }
+
+    function updateUndoRedoButtons() {
+        undoBtn.disabled = history.length === 0;
+        redoBtn.disabled = redoHistory.length === 0;
+        // Optional: Add visual indication for disabled state if needed
+        undoBtn.style.opacity = undoBtn.disabled ? 0.5 : 1;
+        redoBtn.style.opacity = redoBtn.disabled ? 0.5 : 1;
+    }
+
+    // Event listeners for undo/redo buttons
+    undoBtn.addEventListener('click', undo);
+    redoBtn.addEventListener('click', redo);
+
+    // Keyboard shortcuts for undo/redo
+    document.addEventListener('keydown', (e) => {
+      // Only process undo/redo if not in pointer mode
+      if (currentTool !== 'pointer') {
+        if (e.ctrlKey || e.metaKey) { // Check for Ctrl (Windows/Linux) or Cmd (Mac)
+          if (e.key === 'z') {
+            e.preventDefault(); // Prevent default browser undo/redo ONLY when we handle it
+            undo();
+          } else if (e.key === 'y') {
+            e.preventDefault(); // Prevent default browser undo/redo ONLY when we handle it
+            redo();
+          }
+        }
       }
     });
 
     // Initialization
     resizeCanvas(); // Call resize initially AFTER setting up tools etc.
     selectTool('pointer'); // Set default tool *after* initial resize
+    updateUndoRedoButtons(); // Set initial button state
   </script>
 </body>
 </html>
