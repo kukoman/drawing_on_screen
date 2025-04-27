@@ -40,7 +40,6 @@ web_modules/
 
 # Build output
 dist/
-!dist/drawing-tool-portable.zip # Keep this specific zip file
 build/
 out/
 
